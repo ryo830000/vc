@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>声チェンジ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: a single-column mixing desk. Source, transport with level meter, preset pads, fine-tune faders, result tape. */
+:root {
+  --ink: #eef3f6;
+  --panel: #ffffff;
+  --line: #cfdbe2;
+  --text: #14232e;
+  --mute: #56697a;
+  --amber: #0b8f86;
+  --amber-ink: #ffffff;
+  --live: #d92d3a;
+  --font-display: "Dela Gothic One", "Hiragino Sans", "Yu Gothic", sans-serif;
+  --font-body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--ink); color: var(--text); }
+body { font-family: var(--font-body); font-size: 16px; line-height: 1.6; -webkit-text-size-adjust: 100%; }
+main { max-width: 560px; margin: 0 auto; padding: 20px 16px 48px; display: flex; flex-direction: column; gap: 20px; }
+h1 { font-family: var(--font-display); font-weight: 400; font-size: 34px; line-height: 1.1; margin: 0; letter-spacing: .02em; }
+.lead { margin: 6px 0 0; color: var(--mute); font-size: 14px; }
+h2 { font-size: 13px; font-weight: 700; letter-spacing: .08em; color: var(--mute); margin: 0 0 10px; }
+section { display: block; }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+
+.seg { display: grid; grid-template-columns: 1fr 1fr; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 4px; gap: 4px; }
+.seg button { border: 0; background: transparent; padding: 10px 8px; border-radius: 9px; font-weight: 700; font-size: 14px; color: var(--mute); }
+.seg button[aria-pressed="true"] { background: var(--amber); color: var(--amber-ink); }
+.note { margin: 10px 0 0; font-size: 13px; color: var(--mute); }
+.note.warn { color: #8a5a00; }
+
+.filebox { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+.filebtns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.filebtn { font-family: inherit; color: var(--text); position: relative; display: flex; align-items: center; justify-content: center; text-align: center; min-height: 48px; padding: 8px 10px; border: 1px dashed var(--line); border-radius: 12px; background: var(--panel); font-weight: 700; font-size: 14px; cursor: pointer; }
+.filebtn:focus-within { outline: 3px solid var(--amber); outline-offset: 2px; }
+.filebtn input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.fileinfo { font-size: 14px; color: var(--mute); min-height: 1.6em; overflow-wrap: anywhere; }
+.fileinfo b { color: var(--text); font-weight: 700; }
+
+.transport { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.go { width: 100%; min-height: 60px; border: 0; border-radius: 14px; background: var(--amber); color: var(--amber-ink); font-weight: 700; font-size: 20px; letter-spacing: .04em; }
+.go[disabled] { opacity: .4; cursor: not-allowed; }
+.go.live { background: var(--live); color: #fff; }
+.meter { height: 10px; border-radius: 6px; background: #dbe5eb; overflow: hidden; border: 1px solid var(--line); }
+.meter > i { display: block; height: 100%; width: 100%; transform-origin: left center; transform: scaleX(0); background: linear-gradient(90deg, #35c2a5 0%, #0b8f86 65%, #d92d3a 100%); }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.status { font-size: 14px; color: var(--mute); min-height: 1.6em; }
+.status.err { color: #c0262d; }
+.check { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--mute); }
+.check input { width: 20px; height: 20px; accent-color: var(--amber); }
+
+.pads { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; }
+.pad { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 12px 12px 10px; min-height: 68px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); text-align: left; }
+.pad b { font-size: 16px; font-weight: 700; }
+.pad small { font-size: 12px; color: var(--mute); font-variant-numeric: tabular-nums; }
+.pad[aria-pressed="true"] { background: var(--amber); border-color: var(--amber); color: var(--amber-ink); }
+.pad[aria-pressed="true"] small { color: rgba(255,255,255,.85); }
+
+.faders { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 6px 16px; }
+.fader { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.fader:last-child { border-bottom: 0; }
+.fader label { font-weight: 700; font-size: 14px; }
+.fader output { font-variant-numeric: tabular-nums; color: var(--amber); font-weight: 700; font-size: 14px; }
+.fader input[type=range] { grid-column: 1 / -1; width: 100%; height: 32px; accent-color: var(--amber); margin: 0; }
+
+.result { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.result audio { width: 100%; }
+.ghost { min-height: 48px; border: 1px solid var(--amber); background: transparent; color: var(--amber); border-radius: 12px; font-weight: 700; }
+[hidden] { display: none !important; }
+@media (prefers-reduced-motion: no-preference) { .pad, .go, .seg button { transition: background-color .12s, color .12s; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>声チェンジ</h1>
+    <p class="lead">マイクの声や音声ファイルを、その場で別の声に変えます。</p>
+  </header>
+
+  <section aria-labelledby="h-src">
+    <h2 id="h-src">入力</h2>
+    <div class="seg" role="group" aria-label="入力の種類">
+      <button type="button" id="mode-mic" aria-pressed="true">マイク(リアルタイム)</button>
+      <button type="button" id="mode-file" aria-pressed="false">ファイル・録音</button>
+    </div>
+    <p class="note warn" id="note-mic">スピーカーで聞くとハウリングします。イヤホンをつけてください。</p>
+    <p class="note warn" id="note-frame" hidden>この画面ではマイクを使えません。「ファイル・録音」で試すか、ページをブラウザで直接開いてください。</p>
+    <div class="filebox" id="filebox" hidden>
+      <div class="filebtns">
+        <label class="filebtn">音声ファイルを選ぶ<input type="file" id="in-file" accept="audio/*"></label>
+        <button type="button" class="filebtn" id="rec-btn">いま録音する</button>
+      </div>
+      <div class="fileinfo" id="fileinfo">まだ選ばれていません。</div>
+    </div>
+  </section>
+
+  <section class="transport" aria-label="再生操作">
+    <button type="button" class="go" id="go">開始</button>
+    <div class="meter" aria-hidden="true"><i id="meter"></i></div>
+    <div class="row">
+      <div class="status" id="status" role="status" aria-live="polite">プリセットを選んでから開始してください。</div>
+      <label class="check"><input type="checkbox" id="monitor" checked>スピーカーに出す</label>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-pre">
+    <h2 id="h-pre">声のプリセット</h2>
+    <div class="pads" id="pads"></div>
+  </section>
+
+  <section aria-labelledby="h-fine">
+    <h2 id="h-fine">細かく調整</h2>
+    <div class="faders">
+      <div id="speed-box">
+        <div class="fader"><label for="f-speed">速さ</label><output id="o-speed" for="f-speed">×1.00</output><input type="range" id="f-speed" min="0.5" max="2" step="0.05" value="1"></div>
+        <div class="fader"><label class="check" style="grid-column:1 / -1"><input type="checkbox" id="keep-pitch" checked>声の高さは変えずに、速さだけ変える</label></div>
+      </div>
+      <div class="fader"><label for="f-semi">ピッチ(高さ)</label><output id="o-semi" for="f-semi">0</output><input type="range" id="f-semi" min="-12" max="12" step="0.5" value="0"></div>
+      <div class="fader"><label for="f-formant">声の太さ(細い ← → 太い)</label><output id="o-formant" for="f-formant">0</output><input type="range" id="f-formant" min="-10" max="10" step="0.5" value="0"></div>
+      <div class="fader"><label for="f-robot">ロボット</label><output id="o-robot" for="f-robot">0%</output><input type="range" id="f-robot" min="0" max="100" step="5" value="0"></div>
+      <div class="fader"><label for="f-vib">震え</label><output id="o-vib" for="f-vib">0%</output><input type="range" id="f-vib" min="0" max="100" step="5" value="0"></div>
+      <div class="fader"><label for="f-dist">ざらざら(ゆがみ)</label><output id="o-dist" for="f-dist">0%</output><input type="range" id="f-dist" min="0" max="100" step="5" value="0"></div>
+      <div class="fader"><label for="f-echo">エコー</label><output id="o-echo" for="f-echo">0%</output><input type="range" id="f-echo" min="0" max="100" step="5" value="0"></div>
+    </div>
+    <p class="note">変換中でも動かせます。スライダーは離したときに反映されます。</p>
+  </section>
+
+  <section class="result" id="result" hidden aria-labelledby="h-res">
+    <h2 id="h-res" style="margin:0">変換した声</h2>
+    <audio id="player" controls></audio>
+    <button type="button" class="ghost" id="save">保存する</button>
+    <div class="status" id="save-status" role="status" aria-live="polite"></div>
+  </section>
+</main>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (s) => document.querySelector(s);
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const framed = (() => { try { return window.top !== window.self; } catch (e) { return true; } })();
+
+  /* ---------- presets ---------- */
+  const P = (id, name, o) => Object.assign({ id, name, semi: 0, formant: 0, robot: 0, vib: 0, echo: 0, lp: 20000, hp: 0, dist: 0, trem: 0 }, o);
+  const PRESETS = [
+    P("orig", "元の声", {}),
+    P("high", "高い声", { semi: 6 }),
+    P("low", "低い声", { semi: -6 }),
+    P("female", "女声", { semi: 4, formant: 5 }),
+    P("male", "男声", { semi: -4, formant: -5 }),
+    P("girl", "少女", { semi: 7, formant: 6 }),
+    P("boy", "声変わり前", { semi: 5, formant: 3 }),
+    P("baby", "赤ちゃん", { semi: 10, formant: 6, vib: 0.2 }),
+    P("onee", "お姉さん", { semi: 3, formant: 3, echo: 0.08 }),
+    P("oji", "おじさん", { semi: -3, formant: -3, lp: 6000 }),
+    P("old", "おじいさん", { semi: -2, formant: -1, vib: 0.6, lp: 3800 }),
+    P("granny", "おばあさん", { semi: 2, formant: 2, vib: 0.7, lp: 4200 }),
+    P("helium", "ヘリウム", { semi: 9, formant: 8 }),
+    P("mouse", "ねずみ", { semi: 12, formant: 4 }),
+    P("fairy", "妖精", { semi: 12, formant: 9, vib: 0.2, echo: 0.3 }),
+    P("giant", "巨人", { semi: -12, formant: -10, echo: 0.2 }),
+    P("monster", "怪獣", { semi: -12, formant: -6, dist: 0.5, echo: 0.2 }),
+    P("demon", "悪魔", { semi: -10, formant: -8, robot: 0.25, echo: 0.3 }),
+    P("ghost", "お化け", { semi: -3, vib: 0.8, trem: 0.5, echo: 0.7, lp: 5000 }),
+    P("alien", "宇宙人", { semi: 3, vib: 1, robot: 0.35, echo: 0.2 }),
+    P("robot", "ロボット", { robot: 1 }),
+    P("robotlow", "低音ロボット", { semi: -5, robot: 1, echo: 0.1 }),
+    P("phone", "電話", { hp: 400, lp: 3200, dist: 0.2 }),
+    P("radio", "無線", { hp: 500, lp: 2800, dist: 0.4 }),
+    P("mega", "拡声器", { hp: 600, lp: 3500, dist: 0.6, echo: 0.15 }),
+    P("drunk", "酔っ払い", { semi: -2, formant: -2, vib: 0.9 }),
+    P("shake", "震え声", { semi: 1, vib: 1, trem: 0.3 }),
+    P("water", "水の中", { lp: 900, vib: 0.6, echo: 0.3 }),
+    P("cave", "洞窟", { lp: 6000, echo: 1 }),
+    P("echo", "やまびこ", { echo: 0.8 })
+  ];
+  let params = Object.assign({}, PRESETS[0]);
+  let presetId = "orig";
+
+  /* ---------- pitch shifter (two crossfaded delay lines) ---------- */
+  const BUF = 0.1, FADE = 0.05;
+  const bufCache = new WeakMap();
+  function shifterBuffers(ctx) {
+    let b = bufCache.get(ctx);
+    if (b) return b;
+    const sr = ctx.sampleRate;
+    const len = Math.round(BUF * sr), fl = Math.round(FADE * sr);
+    const fade = ctx.createBuffer(1, len, sr), up = ctx.createBuffer(1, len, sr), down = ctx.createBuffer(1, len, sr);
+    const f = fade.getChannelData(0), u = up.getChannelData(0), d = down.getChannelData(0);
+    for (let i = 0; i < len; i++) {
+      f[i] = i < fl ? Math.sqrt(i / fl) : Math.sqrt(Math.max(0, 1 - (i - fl) / (len - fl)));
+      u[i] = (len - i) / len;
+      d[i] = i / len;
+    }
+    b = { fade, up, down };
+    bufCache.set(ctx, b);
+    return b;
+  }
+
+  /* ---------- effect chain ---------- */
+  function buildChain(ctx, input, p) {
+    const srcs = [], nodes = [input];
+    const now = ctx.currentTime;
+    const add = (n) => { nodes.push(n); return n; };
+    const begin = (s, t) => { s.start(t); srcs.push(s); return s; };
+    let cur = input;
+    const link = (n) => { nodes.push(n); cur.connect(n); cur = n; return n; };
+
+    // 1. pitch
+    if (Math.abs(p.semi) > 0.01) {
+      const ratio = Math.pow(2, p.semi / 12);
+      const B = shifterBuffers(ctx);
+      const buf = ratio > 1 ? B.up : B.down;
+      const amount = Math.abs(ratio - 1) * BUF;
+      const out = add(ctx.createGain());
+      [0, FADE].forEach((off) => {
+        const d = add(ctx.createDelay(1));
+        const m = add(ctx.createGain()); m.gain.value = 0;
+        const g = add(ctx.createGain()); g.gain.value = amount;
+        const mod = add(ctx.createBufferSource()); mod.buffer = buf; mod.loop = true;
+        const fd = add(ctx.createBufferSource()); fd.buffer = B.fade; fd.loop = true;
+        mod.connect(g); g.connect(d.delayTime);
+        fd.connect(m.gain);
+        cur.connect(d); d.connect(m); m.connect(out);
+        begin(mod, now + off); begin(fd, now + off);
+      });
+      cur = out;
+    }
+
+    // 2. formant-like tone shaping
+    if (Math.abs(p.formant) > 0.01) {
+      const f = p.formant;
+      const ls = link(ctx.createBiquadFilter()); ls.type = "lowshelf"; ls.frequency.value = 320; ls.gain.value = -f * 0.9;
+      const pk = link(ctx.createBiquadFilter()); pk.type = "peaking"; pk.frequency.value = 1800; pk.Q.value = 0.8; pk.gain.value = f * 0.5;
+      const hs = link(ctx.createBiquadFilter()); hs.type = "highshelf"; hs.frequency.value = 3200; hs.gain.value = f * 0.9;
+    }
+
+    // 2b. high-pass (thin, telephone-like)
+    if (p.hp > 20) {
+      const hp = link(ctx.createBiquadFilter()); hp.type = "highpass"; hp.frequency.value = p.hp; hp.Q.value = 0.7;
+    }
+
+    // 3. tremble (vibrato)
+    if (p.vib > 0.01) {
+      const d = link(ctx.createDelay(0.1)); d.delayTime.value = 0.01;
+      const lfo = ctx.createOscillator(); lfo.frequency.value = 5.2;
+      const dep = add(ctx.createGain()); dep.gain.value = 0.0025 * p.vib;
+      lfo.connect(dep); dep.connect(d.delayTime);
+      begin(lfo, now);
+    }
+
+    // 3b. amplitude tremolo
+    if (p.trem > 0.01) {
+      const tg = link(ctx.createGain()); tg.gain.value = 1 - p.trem * 0.5;
+      const tl = ctx.createOscillator(); tl.frequency.value = 6.5;
+      const td = add(ctx.createGain()); td.gain.value = p.trem * 0.5;
+      tl.connect(td); td.connect(tg.gain);
+      begin(tl, now);
+    }
+
+    // 4. robot (ring modulator + short comb)
+    if (p.robot > 0.01) {
+      const mix = add(ctx.createGain());
+      const dry = add(ctx.createGain()); dry.gain.value = 1 - p.robot;
+      cur.connect(dry); dry.connect(mix);
+      const ring = add(ctx.createGain()); ring.gain.value = 0;
+      const osc = ctx.createOscillator(); osc.type = "sine"; osc.frequency.value = 50;
+      osc.connect(ring.gain); begin(osc, now);
+      cur.connect(ring);
+      const wet = add(ctx.createGain()); wet.gain.value = p.robot * 1.4;
+      ring.connect(wet); wet.connect(mix);
+      const comb = add(ctx.createDelay(0.05)); comb.delayTime.value = 0.006;
+      const fb = add(ctx.createGain()); fb.gain.value = 0.55;
+      wet.connect(comb); comb.connect(fb); fb.connect(comb); comb.connect(mix);
+      cur = mix;
+    }
+
+    // 4b. distortion
+    if (p.dist > 0.01) {
+      const ws = link(ctx.createWaveShaper());
+      const k = p.dist * 60, n = 2048, curve = new Float32Array(n);
+      for (let i = 0; i < n; i++) { const x = (i * 2) / n - 1; curve[i] = ((3 + k) * x * 20 * (Math.PI / 180)) / (Math.PI + k * Math.abs(x)); }
+      ws.curve = curve; ws.oversample = "2x";
+      const mk = link(ctx.createGain()); mk.gain.value = 0.8;
+    }
+
+    // 5. muffle
+    if (p.lp < 19000) {
+      const lp = link(ctx.createBiquadFilter()); lp.type = "lowpass"; lp.frequency.value = p.lp; lp.Q.value = 0.7;
+    }
+
+    // 6. echo
+    if (p.echo > 0.01) {
+      const mix = add(ctx.createGain());
+      cur.connect(mix);
+      const dl = add(ctx.createDelay(1)); dl.delayTime.value = 0.27;
+      const fb = add(ctx.createGain()); fb.gain.value = 0.38;
+      const wet = add(ctx.createGain()); wet.gain.value = p.echo * 0.7;
+      cur.connect(dl); dl.connect(fb); fb.connect(dl); dl.connect(wet); wet.connect(mix);
+      cur = mix;
+    }
+
+    // 7. level safety
+    link(ctx.createDynamicsCompressor());
+    link(ctx.createGain());
+
+    return {
+      output: cur,
+      dispose() {
+        srcs.forEach((s) => { try { s.stop(); } catch (e) {} });
+        nodes.forEach((n) => { try { n.disconnect(); } catch (e) {} });
+      }
+    };
+  }
+
+  /* ---------- session ---------- */
+  let S = null;
+  let mode = framed ? "file" : "mic";
+  let fileBuf = null;
+  let lastUrl = null, lastBlob = null, lastExt = "webm";
+  let downloadsCap = null;
+  let speed = 1, keepPitch = true;
+  function eff() {
+    const p = Object.assign({}, params);
+    if (mode === "file" && keepPitch && speed !== 1) p.semi = p.semi - 12 * Math.log2(speed);
+    return p;
+  }
+
+  function setStatus(msg, isErr) {
+    const el = $("#status");
+    el.textContent = msg;
+    el.classList.toggle("err", !!isErr);
+  }
+
+  function pickMime() {
+    if (!window.MediaRecorder) return null;
+    const list = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
+    for (const t of list) { try { if (MediaRecorder.isTypeSupported(t)) return t; } catch (e) {} }
+    return null;
+  }
+
+  function setRunningUI(on) {
+    const b = $("#go");
+    b.classList.toggle("live", on);
+    b.textContent = on ? "停止" : (mode === "mic" ? "開始" : "再生して変換");
+    b.disabled = !on && mode === "file" && !fileBuf;
+    if (!on) $("#meter").style.transform = "scaleX(0)";
+  }
+
+  function micFailed(err) {
+    const denied = err && (err.name === "NotAllowedError" || err.name === "SecurityError");
+    $("#note-frame").hidden = !(denied && framed);
+    setStatus(denied
+      ? "マイクを使えませんでした。ブラウザのマイク許可を確認するか、「ファイル・録音」を使ってください。"
+      : "マイクが見つかりませんでした。", true);
+  }
+
+  async function start() {
+    if (S) return;
+    if (!AC) { setStatus("このブラウザは音声処理に対応していません。", true); return; }
+    setStatus("");
+    const ctx = new AC();
+    try { await ctx.resume(); } catch (e) {}
+    let src, stream = null;
+    if (mode === "mic") {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      } catch (err) {
+        try { ctx.close(); } catch (e) {}
+        micFailed(err);
+        return;
+      }
+      src = ctx.createMediaStreamSource(stream);
+    } else {
+      if (!fileBuf) { try { ctx.close(); } catch (e) {} return; }
+      src = ctx.createBufferSource();
+      src.buffer = fileBuf;
+      src.playbackRate.value = speed;
+    }
+    const inGain = ctx.createGain();
+    src.connect(inGain);
+    const bus = ctx.createGain();
+    const mon = ctx.createGain(); mon.gain.value = $("#monitor").checked ? 1 : 0;
+    const analyser = ctx.createAnalyser(); analyser.fftSize = 512;
+    bus.connect(mon); mon.connect(ctx.destination); bus.connect(analyser);
+
+    let rec = null; const chunks = [];
+    const mime = pickMime();
+    if (mime) {
+      try {
+        const dest = ctx.createMediaStreamDestination();
+        bus.connect(dest);
+        rec = new MediaRecorder(dest.stream, { mimeType: mime });
+        rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+        rec.onstop = () => finishRec(chunks, mime);
+        rec.start();
+      } catch (e) { rec = null; }
+    }
+
+    const chain = buildChain(ctx, inGain, eff());
+    chain.output.connect(bus);
+    S = { ctx, src, stream, inGain, bus, mon, chain, rec, raf: 0 };
+    const mySession = S;
+
+    if (mode === "file") {
+      src.onended = () => {
+        setTimeout(() => { if (S === mySession) stop(); }, params.echo > 0.01 ? 1200 : 300);
+      };
+      src.start();
+    }
+
+    const data = new Uint8Array(analyser.fftSize);
+    let level = 0;
+    const tick = () => {
+      analyser.getByteTimeDomainData(data);
+      let m = 0;
+      for (let i = 0; i < data.length; i++) { const v = Math.abs(data[i] - 128); if (v > m) m = v; }
+      level = Math.max(m / 90, level * 0.85);
+      $("#meter").style.transform = "scaleX(" + Math.min(1, level) + ")";
+      mySession.raf = requestAnimationFrame(tick);
+    };
+    tick();
+    setRunningUI(true);
+    setStatus(mode === "mic" ? "変換中。話してみてください。" : "再生しながら変換中です。");
+  }
+
+  function stop() {
+    const s = S;
+    if (!s) return;
+    S = null;
+    cancelAnimationFrame(s.raf);
+    try { if (s.src.stop) s.src.stop(); } catch (e) {}
+    s.chain.dispose();
+    if (s.stream) s.stream.getTracks().forEach((t) => t.stop());
+    if (s.rec && s.rec.state !== "inactive") { try { s.rec.stop(); } catch (e) {} }
+    setTimeout(() => { try { s.ctx.close(); } catch (e) {} }, 500);
+    setRunningUI(false);
+    setStatus("止めました。下で変換した声を聞けます。");
+  }
+
+  function rebuild() {
+    if (!S) return;
+    S.chain.dispose();
+    S.chain = buildChain(S.ctx, S.inGain, eff());
+    S.chain.output.connect(S.bus);
+  }
+
+  function finishRec(chunks, mime) {
+    if (!chunks.length) return;
+    const type = mime.split(";")[0];
+    const blob = new Blob(chunks, { type });
+    if (!blob.size) return;
+    if (lastUrl) URL.revokeObjectURL(lastUrl);
+    lastUrl = URL.createObjectURL(blob);
+    lastBlob = blob;
+    lastExt = type.indexOf("webm") >= 0 ? "webm" : "mp4";
+    $("#player").src = lastUrl;
+    $("#result").hidden = false;
+    $("#save").hidden = !(downloadsCap || !framed);
+    $("#save-status").textContent = "";
+  }
+
+  async function saveResult() {
+    if (!lastBlob) return;
+    const name = "voice-" + presetId + "." + lastExt;
+    const st = $("#save-status");
+    try {
+      if (downloadsCap) {
+        await downloadsCap.save({ filename: name, data: lastBlob });
+        st.textContent = "保存しました。";
+      } else {
+        const a = document.createElement("a");
+        a.href = lastUrl; a.download = name;
+        document.body.appendChild(a); a.click(); a.remove();
+        st.textContent = "保存を開始しました。";
+      }
+    } catch (err) {
+      st.textContent = err && err.code === "declined" ? "保存をやめました。" : "この画面では保存できませんでした。";
+    }
+  }
+
+  /* ---------- file input ---------- */
+  async function onFile(file) {
+    if (!file) return;
+    if (S) stop();
+    $("#fileinfo").textContent = "読み込み中…";
+    try {
+      const ab = await file.arrayBuffer();
+      const dctx = new AC();
+      const buf = await new Promise((res, rej) => { dctx.decodeAudioData(ab, res, rej); });
+      try { dctx.close(); } catch (e) {}
+      fileBuf = buf;
+      const sec = Math.round(buf.duration * 10) / 10;
+      const info = $("#fileinfo");
+      info.textContent = "";
+      const b = document.createElement("b"); b.textContent = file.name || "録音";
+      info.appendChild(b);
+      info.appendChild(document.createTextNode("(" + sec + "秒)"));
+      setStatus("準備できました。「再生して変換」を押してください。");
+      setRunningUI(false);
+    } catch (e) {
+      fileBuf = null;
+      $("#fileinfo").textContent = "この形式は読み込めませんでした。mp3、m4a、wav などを試してください。";
+      setRunningUI(false);
+    }
+  }
+
+  /* ---------- in-page recording (for file mode) ---------- */
+  let micRec = null, micStream = null, micChunks = [];
+  async function toggleRecord() {
+    const btn = $("#rec-btn");
+    if (micRec) { try { micRec.stop(); } catch (e) {} return; }
+    if (S) stop();
+    try {
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+      $("#fileinfo").textContent = "この画面では録音できません。スマホの録音アプリ(iPhoneは「ボイスメモ」)で録音して、「音声ファイルを選ぶ」から選んでください。";
+      return;
+    }
+    const mime = pickMime();
+    micChunks = [];
+    try { micRec = mime ? new MediaRecorder(micStream, { mimeType: mime }) : new MediaRecorder(micStream); }
+    catch (e) { micStream.getTracks().forEach((t) => t.stop()); $("#fileinfo").textContent = "このブラウザでは録音できません。"; return; }
+    const rec = micRec;
+    rec.ondataavailable = (e) => { if (e.data && e.data.size) micChunks.push(e.data); };
+    rec.onstop = async () => {
+      micStream.getTracks().forEach((t) => t.stop());
+      const type = rec.mimeType || (mime ? mime.split(";")[0] : "audio/webm");
+      const blob = new Blob(micChunks, { type });
+      micRec = null;
+      btn.textContent = "いま録音する";
+      if (blob.size) await onFile(new File([blob], "録音", { type }));
+    };
+    rec.start();
+    btn.textContent = "録音を止める";
+    $("#fileinfo").textContent = "録音中です。話し終わったら「録音を止める」を押してください。";
+  }
+
+  /* ---------- UI wiring ---------- */
+  const F = {
+    semi: { el: $("#f-semi"), out: $("#o-semi"), fmt: (v) => (v > 0 ? "+" : "") + v },
+    formant: { el: $("#f-formant"), out: $("#o-formant"), fmt: (v) => (v > 0 ? "+" : "") + v },
+    robot: { el: $("#f-robot"), out: $("#o-robot"), fmt: (v) => v + "%" },
+    vib: { el: $("#f-vib"), out: $("#o-vib"), fmt: (v) => v + "%" },
+    dist: { el: $("#f-dist"), out: $("#o-dist"), fmt: (v) => v + "%" },
+    echo: { el: $("#f-echo"), out: $("#o-echo"), fmt: (v) => v + "%" }
+  };
+  const PCT = { robot: true, vib: true, echo: true, dist: true };
+
+  function syncSliders() {
+    Object.keys(F).forEach((k) => {
+      const v = PCT[k] ? Math.round(params[k] * 100) : params[k];
+      F[k].el.value = v;
+      F[k].out.textContent = F[k].fmt(v);
+    });
+  }
+
+  function markPreset() {
+    document.querySelectorAll(".pad").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.id === presetId)));
+  }
+
+  function choosePreset(id) {
+    const p = PRESETS.find((x) => x.id === id);
+    params = Object.assign({}, p);
+    presetId = id;
+    syncSliders();
+    markPreset();
+    rebuild();
+  }
+
+  const pads = $("#pads");
+  PRESETS.forEach((p) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "pad"; b.dataset.id = p.id;
+    const n = document.createElement("b"); n.textContent = p.name;
+    const s = document.createElement("small");
+    s.textContent = p.semi === 0 ? (p.robot || p.echo || p.vib || p.dist || p.hp || p.lp < 19000 || p.trem ? "エフェクト" : "そのまま") : (p.semi > 0 ? "+" : "") + p.semi + " 半音";
+    b.appendChild(n); b.appendChild(s);
+    b.addEventListener("click", () => choosePreset(p.id));
+    pads.appendChild(b);
+  });
+
+  Object.keys(F).forEach((k) => {
+    const el = F[k].el;
+    el.addEventListener("input", () => {
+      const v = parseFloat(el.value);
+      F[k].out.textContent = F[k].fmt(v);
+    });
+    el.addEventListener("change", () => {
+      const v = parseFloat(el.value);
+      params[k] = PCT[k] ? v / 100 : v;
+      presetId = "custom";
+      markPreset();
+      rebuild();
+    });
+  });
+
+  const spEl = $("#f-speed");
+  spEl.addEventListener("input", () => { $("#o-speed").textContent = "×" + parseFloat(spEl.value).toFixed(2); });
+  spEl.addEventListener("change", () => {
+    speed = parseFloat(spEl.value);
+    if (S && S.src.playbackRate) S.src.playbackRate.value = speed;
+    rebuild();
+  });
+  $("#keep-pitch").addEventListener("change", (e) => { keepPitch = e.target.checked; rebuild(); });
+
+  function setMode(m) {
+    if (S) stop();
+    mode = m;
+    $("#mode-mic").setAttribute("aria-pressed", String(m === "mic"));
+    $("#mode-file").setAttribute("aria-pressed", String(m === "file"));
+    $("#note-mic").hidden = m !== "mic";
+    $("#filebox").hidden = m !== "file";
+    $("#speed-box").hidden = m !== "file";
+    $("#note-frame").hidden = !(framed && m === "mic");
+    setRunningUI(false);
+    setStatus(m === "mic" ? "プリセットを選んでから開始してください。" : (fileBuf ? "準備できました。「再生して変換」を押してください。" : "音声ファイルを選ぶか、録音してください。"));
+  }
+
+  $("#mode-mic").addEventListener("click", () => setMode("mic"));
+  $("#mode-file").addEventListener("click", () => setMode("file"));
+  $("#go").addEventListener("click", () => { if (S) stop(); else start(); });
+  $("#monitor").addEventListener("change", (e) => { if (S) S.mon.gain.value = e.target.checked ? 1 : 0; });
+  $("#in-file").addEventListener("change", (e) => { onFile(e.target.files[0]); e.target.value = ""; });
+  $("#rec-btn").addEventListener("click", toggleRecord);
+  $("#save").addEventListener("click", saveResult);
+
+  syncSliders();
+  markPreset();
+  setMode(mode);
+
+  try {
+    if (window.claude && window.claude.use) {
+      window.claude.use("downloads").then((d) => { downloadsCap = d || null; if (!$("#result").hidden) $("#save").hidden = !(downloadsCap || !framed); }, () => {});
+    }
+  } catch (e) {}
+})();
+</script>
+</body>
+</html>
